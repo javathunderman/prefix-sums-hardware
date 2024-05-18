@@ -1,0 +1,8 @@
+*.gz
+*.log
+*.aux
+*.out
+*.fls
+*_latexmk
+*.vscode/
+*.pdf

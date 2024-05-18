@@ -1,0 +1,11 @@
+import "primitives/core.fil";
+import "examples/sequential.fil";
+import "./alu-subcomponent.fil";
+
+// operator parameter lives for cycles 3 to 4, same with result - operands last for only one cycle after starting
+comp main<'G: 1>(go: interface['G], op: ['G+3, 'G+4] 1, left: ['G, 'G+1] 32, right: ['G, 'G+1] 32) -> (out: ['G+3,'G+4] 32) {
+    curr_alu := new ALU<'G>(op, left, right);
+    // instantiate the ALU
+    out = curr_alu.out;
+    // just set the component output to the ALU's output (nothing else)
+}

@@ -1,0 +1,11 @@
+import "primitives/core.fil";
+import "examples/sequential.fil";
+import "./alu-subcomponent.fil";
+
+// Identical to alu-demo.fil, except we add another register to persist state for an additional cycle
+comp main<'G: 1>(go: interface['G], op: ['G+3, 'G+4] 1, left: ['G, 'G+1] 32, right: ['G, 'G+1] 32) -> (out: ['G+4,'G+5] 32) {
+    curr_alu := new ALU<'G>(op, left, right);
+    // This is what pushes the cycle count up from 7 -> 8
+    r0 := new Register[32]<'G+3, 'G+5>(curr_alu.out);
+    out = r0.out;
+}

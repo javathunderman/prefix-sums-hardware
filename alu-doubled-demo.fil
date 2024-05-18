@@ -1,0 +1,11 @@
+import "primitives/core.fil";
+import "examples/sequential.fil";
+import "./alu-subcomponent.fil";
+
+comp main<'G: 3>(go: interface['G], op: ['G+3, 'G+4] 1, left: ['G, 'G+1] 32, right: ['G, 'G+1] 32) -> (out: ['G+6,'G+7] 32) {
+    curr_alu := new ALU<'G>(op, left, right);
+    r0 := new Register[32]<'G+3, 'G+7>(curr_alu.out);
+    r1 := new Register[32]<'G+4, 'G+7>(r0.out);
+    adder := new Add[32]<'G+6>(r1.out, r0.out);
+    out = adder.out;
+}

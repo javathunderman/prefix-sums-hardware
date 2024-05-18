@@ -1,0 +1,168 @@
+import "primitives/core.futil";
+import "primitives/memories/comb.futil";
+
+component main() -> (@done done: 1) {
+  cells {
+    @external input_arr = comb_mem_d1(8, 8, 8);
+    @external output_final = comb_mem_d1(8, 8, 8);
+    gen_add = std_add(8);
+    val_1 = std_reg(8);
+    adder_res = std_reg(8);
+
+  }
+
+  wires {
+    group read_0 {
+        input_arr.addr0 = 8'd0; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_0[done] = val_1.done;
+    }
+
+    group read_1 {
+        input_arr.addr0 = 8'd1; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_1[done] = val_1.done;
+    }
+
+    group read_2 {
+        input_arr.addr0 = 8'd2; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_2[done] = val_1.done;
+    }
+
+    group read_3 {
+        input_arr.addr0 = 8'd3; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_3[done] = val_1.done;
+    }
+    group read_4 {
+        input_arr.addr0 = 8'd4; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_4[done] = val_1.done;
+    }
+
+    group read_5 {
+        input_arr.addr0 = 8'd5; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_5[done] = val_1.done;
+    }
+
+    group read_6 {
+        input_arr.addr0 = 8'd6; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_6[done] = val_1.done;
+    }
+
+    group read_7 {
+        input_arr.addr0 = 8'd7; // index
+        val_1.write_en = 1'b1;
+        val_1.in = input_arr.read_data;
+        read_7[done] = val_1.done;
+    }
+
+    group add_op {
+        gen_add.left = val_1.out;
+        gen_add.right = adder_res.out;
+        adder_res.write_en = 1'b1;
+        adder_res.in = gen_add.out;
+        add_op[done] = adder_res.done;
+    }
+
+    group acc_set_0 {
+       output_final.addr0 = 8'd0;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_0[done] = output_final.done;
+    }
+    group acc_set_1 {
+       output_final.addr0 = 8'd1;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_1[done] = output_final.done;
+    }
+    group acc_set_2 {
+       output_final.addr0 = 8'd2;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_2[done] = output_final.done;
+    }
+    group acc_set_3 {
+       output_final.addr0 = 8'd3;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_3[done] = output_final.done;
+    }
+    group acc_set_4 {
+       output_final.addr0 = 8'd4;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_4[done] = output_final.done;
+    }
+
+    group acc_set_5 {
+       output_final.addr0 = 8'd5;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_5[done] = output_final.done;
+    }
+    group acc_set_6 {
+       output_final.addr0 = 8'd6;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_6[done] = output_final.done;
+    }
+    group acc_set_7 {
+       output_final.addr0 = 8'd7;
+       output_final.write_en = 1'b1;
+       output_final.write_data = adder_res.out;
+       acc_set_7[done] = output_final.done;
+    }
+
+  }
+
+  control {
+    seq { // Read each value, add it to the accumulator register, and set the corresponding value in the vector memory
+        read_0;
+        add_op;
+        acc_set_0;
+
+        read_1;
+        add_op;
+        acc_set_1;
+
+
+        read_2;
+        add_op;
+        acc_set_2;
+
+
+        read_3;
+        add_op;
+        acc_set_3;
+
+        read_4;
+        add_op;
+        acc_set_4;
+
+        read_5;
+        add_op;
+        acc_set_5;
+
+        read_6;
+        add_op;
+        acc_set_6;
+
+
+        read_7;
+        add_op;
+        acc_set_7;
+    }
+  }
+}
