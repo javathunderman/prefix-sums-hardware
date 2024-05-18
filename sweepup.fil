@@ -12,7 +12,7 @@ comp main<'G:2>(
   in6: ['G, 'G+1] 32,
   in7: ['G, 'G+1] 32,
 ) -> (
-  out0: ['G+3, 'G+4] 32,
+  out0: ['G+4, 'G+5] 32,
 )
 {
   // Pack the inputs (which arrive on separate wires) into a single bundle
@@ -56,10 +56,12 @@ comp main<'G:2>(
   r2 := new Register[32]<'G+2, 'G+4>(a_2.out);
   second_layer{1} = r2.out;
 
-  // Repeat again for the top most element, but skip using a register to hold values around
+  bundle third_layer[1]: ['G+4, 'G+5] 32;
+  // Repeat again for the top most element
   a_3 := new Add[32]<'G + 3>(second_layer{0}, second_layer{1});
+  r3 := new Register[32]<'G+3, 'G+5>(a_3.out);
 
-  // Return the top of the tree
-  out0 = a_3.out;
+  third_layer{0} = r3.out;
+  out0 = third_layer{0};
 
 }
