@@ -6,3 +6,6 @@
 *_latexmk
 *.vscode/
 *.pdf
+*.run.xml
+*.bbl
+*.bcf

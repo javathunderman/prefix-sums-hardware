@@ -1,9 +1,11 @@
 \documentclass[12pt]{article}
-
+\usepackage[backend=biber]{biblatex}
+\addbibresource{final_report.bib}
 \usepackage{hyperref}
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{float}
+\usepackage{hyperref}
 \title{CMSC858N - Final report}
 \author{Arjun Vedantham}
 \date{May 2024}
@@ -26,21 +28,21 @@ parallelizability (due to the global interpreter lock that essentially limits Py
 concurrency). FPGAs and other custom architecture platforms have natural parallelism built into the structure
 of their hardware since they do not inherently serialize workloads like most von Neumann computers.
 
-This led us to work on Zinnia, a domain specific language that could be used to generate
+This led us to work on Zinnia (\url{https://github.com/javathunderman/zinnia}), a domain specific language that could be used to generate
 hardware descriptions in Verilog that could be deployed to an FPGA. Our language's compiler used
 the Calyx intermediate representation, developed by the CAPRA group at Cornell.
 
 As part of the project, I wrote some implementations of primitive functions typically used in functional
 programming (including parallel scan/prefix sums, filter, etc.) in the Calyx IR so that it could be used from within our language.
 In this project, I expanded on those parallel algorithm implementations, and analyze implementations
-in both the Calyx IR, as well as the Filament hardware description language, which was also developed by CAPRA
+in both the Calyx IR\cite{nigam_compiler_2021}, as well as the Filament hardware description language\cite{nigam_modular_2023}, which was also developed by CAPRA
 and uses Calyx as its intermediate representation. In particular, Filament raises the level of abstraction by
 implementing "timeline types" that represent circuit delays between components as part of the language's
 type system, making easier to develop hardware with correct timing.
 
 \section{Scan}
 \subsection{Prefix Sums/Parallel Scan}
-I focused on implementing the prefix sums algorithm in the Calyx IR. This version of the prefix
+I focused on implementing the prefix sums algorithm\cite{blelloch_prefix_1990} in the Calyx IR. This version of the prefix
 sums algorithm is quite limited, and supports only addition of 8 integers (though the bit width of the integers
 can be customized).
 
@@ -56,7 +58,7 @@ in practice we have high constants that really affect performance at cycle-scale
     \includegraphics[height=25em]{images/prefix_sums.png}
     \caption{For running scan with an addition operator on 8 integers, we're getting 71 cycles, mostly because the speedup
     is limited by accessing the combinational memories (which takes at least a cycle) and because
-    of the span-dependent "sweep-down" phase of the algorithm.}
+    of the span-dependent "sweep-down" phase of the algorithm. The code for this implementation is in scan.futil.}
 \end{figure}
 \subsection{Sequential scan}
 As a comparison point, I also wrote a sequential version of scan, also in the Calyx IR. Due to the reduced dependence on
@@ -67,7 +69,8 @@ reading from and writing to combinational memories, the sequential version actua
     \centering
     \includegraphics[height=25em]{images/seq_sums_scan.png}
     \caption{For the equivalent sequential version of scan, we get away with just 17 cycles. This is because the number of
-    reads/writes to combinational memories is reduced by only having one register/value to deal with at a time. }
+    reads/writes to combinational memories is reduced by only having one register/value to deal with at a time. The code for this implementation
+    is in seq\_scan.futil.}
 \end{figure}
 
 \subsection{Filament HDL}
@@ -101,5 +104,8 @@ same result from the last addition operation instead of using the new result in 
 \end{figure}
 
 As of 2024-05-17, I am still working on trying to resolve this issue to make more progress in the pipelined/parallelized version of
-the prefix sums algorithm.
+the prefix sums algorithm. The current code is available here: \url{https://github.com/javathunderman/cmsc858n-final}.
+\clearpage
+\nocite{*}
+\printbibliography
 \end{document}
