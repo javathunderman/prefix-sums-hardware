@@ -15,6 +15,8 @@ comp main<'G:2>(
   out0: ['G+3, 'G+4] 32,
 )
 {
+  // Pack the inputs (which arrive on separate wires) into a single bundle
+  // The input bundle lives for 1 cycle (start -> start + 1 cycle)
   bundle input_bundle[8]: ['G, 'G+1] 32;
   input_bundle{0} = in0;
   input_bundle{1} = in1;
@@ -25,17 +27,25 @@ comp main<'G:2>(
   input_bundle{6} = in6;
   input_bundle{7} = in7;
 
+  // Generate the first layer
+  // To be concise, I have just created a bundle of size 8 and scheduled to do pairwise additions on the adders
+  // We only need the results at even numbered indices since we want the operands to be exclusive (Filament only allows single increments)
   bundle first_layer[8]: ['G+1, 'G+3] 32;
 
+  // This is pipelined and takes only a cycle to evaluate!
   for i in 0..7 {
     a := new Add[32]<'G>(input_bundle{i}, input_bundle{i + 1});
     r0 := new Register[32]<'G, 'G+3>(a.out);
     first_layer{i} = r0.out;
   }
+
+  // Set the last value manually to avoid indexing problems
   a := new Add[32]<'G>(input_bundle{6}, input_bundle{7});
   r0 := new Register[32]<'G, 'G+3>(a.out);
   first_layer{7} = r0.out;
 
+  // Create the bundle for the second layer
+  // Add using the operands from the first layer
   bundle second_layer[2]: ['G+3, 'G+4] 32;
 
   a_1 := new Add[32]<'G + 2>(first_layer{0}, first_layer{2});
@@ -46,7 +56,10 @@ comp main<'G:2>(
   r2 := new Register[32]<'G+2, 'G+4>(a_2.out);
   second_layer{1} = r2.out;
 
+  // Repeat again for the top most element, but skip using a register to hold values around
   a_3 := new Add[32]<'G + 3>(second_layer{0}, second_layer{1});
+
+  // Return the top of the tree
   out0 = a_3.out;
 
 }
