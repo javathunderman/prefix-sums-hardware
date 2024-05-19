@@ -6,6 +6,7 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{hyperref}
+\usepackage[normalem]{ulem}
 \title{CMSC858N - Final report}
 \author{Arjun Vedantham}
 \date{May 2024}
@@ -51,7 +52,7 @@ is limited on two fronts. First, the memory primitives in Calyx's standard libra
 any kind of concurrent accesses. Additionally, it takes at least a cycle to access values in the memories and load
 them into a register, which is necessary since values held in registers in this language are not guaranteed
 to preserve state for more than a single cycle. Thus, even though this still executes in $O(n)$ time,
-in practice we have high constants that really affect performance at cycle-scale.
+in practice we have high constant factors (from the repeated, cycle-long accesses to memory) that really affect performance at this scale.
 
 \begin{figure}[H]
     \centering
@@ -99,12 +100,60 @@ same result from the last addition operation instead of using the new result in 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{images/alu_result_doubled.png}
-    \caption{The result of attempting to construct the next layer of the prefix sums tree - the circuit is retaining the same value in
+    \caption{The previous result of attempting to construct the next layer of the prefix sums tree - the circuit is retaining the same value in
     the storage register, instead of adding it to the result of the new addition operation.}
 \end{figure}
 
-As of 2024-05-17, I am still working on trying to resolve this issue to make more progress in the pipelined/parallelized version of
-the prefix sums algorithm. The current code is available here: \url{https://github.com/javathunderman/cmsc858n-final}.
+\sout{As of 2024-05-17, I am still working on trying to resolve this issue to make more progress in the pipelined/parallelized version of
+the prefix sums algorithm.}
+
+I was able to solve this using "bundles", a form of fixed size array that can be set to last for a certain number of cycles. Using this,
+I was able to schedule adds to go up the prefix sums tree, with synchronization only required between layers of the tree (rather than after each addition
+to move the stored register value to a new location, like a shift register would have required).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/parallel_sweepup.png}
+    \caption{Fully parallel sweepup, with synchronization only between layers of the tree - here it takes 3 cycles due to the tree height (plus/minus 1 cycle), for an n = 8 list}
+\end{figure}
+
+Following this, I was able to determine the left subtree sums at each level of the tree, and store those values in another "bundle" structure. Finally,
+did a level-by-level traversal of the left sum tree (starting with the root node), and pushed left subtree sums downwards to accumulate the full
+prefix sums value in the output array. Even though this was tested for fairly small values of n ($n = 8$ in this case), the optimal bounds of running prefix
+sums are preserved, as the addition is fully parallelized on the upsweep, and the only sequential chain of dependencies is during the sweep down,
+which is parallelized by sweeping over the list and finding element indices that match the range for a particular sum dependency (e.g. for $n = 8$,
+elements with index 2 and 3 share a partial subtree sum since they are right grandchildren of an element).
+
+In the end, the pipelined adder modules and parallelized "for" loops allows for far faster evaluation, and outperformed the sequential version written in
+Calyx IR.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/filament_prefix_sums.png}
+    \caption{Fully parallelized prefix sums, for an n = 8 list - takes 12 cycles to run prefix sums. Code is in prefix-sums-8.fil.}
+\end{figure}
+
+\section{Conclusion}
+Altogether, the fully parallelized version of prefix sums written in the Filament HDL outperformed
+both the sequential and partially parallelized implementations of the same algorithm in the Calyx IR.
+I was able to reduce the runtime from over 70 cycles to just 12 cycles, which outperforms an ideal sequential
+hardware implementation.
+
+This implementation was limited to a specific input size since Filament disallows top-level/simulation-ready
+circuits with parameterizable inputs. As such, each of the input values of the list had to be modeled as a separate
+input signal on a wire that was connected to the prefix sums circuit. Future work would include shrinking the implementation
+footprint by using more of Filament's metaprogramming features to avoid having to handle each input as an individual signal.
+Additionally, I would like to eventually bind a parameterizable implementation of this algorithm into our DSL project
+instead of using the more verbose (and slower/less flexible) Calyx IR implementation. This would serve as a basis
+for other common functional language features, like map, filter, fold, etc.
+
+The current code is available here: \url{https://github.com/javathunderman/cmsc858n-final}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{images/prefixsumstree.jpg}
+    \caption{Prefix sums tree, with left subtree sums on the side}
+\end{figure}
 \clearpage
 \nocite{*}
 \printbibliography
