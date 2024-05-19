@@ -1,0 +1,197 @@
+import "primitives/core.fil";
+import "examples/sequential.fil";
+import "primitives/math/math.fil";
+
+comp main<'G:12>(
+  go: interface['G],
+  in0: ['G, 'G+12] 32,
+  in1: ['G, 'G+12] 32,
+  in2: ['G, 'G+12] 32,
+  in3: ['G, 'G+12] 32,
+  in4: ['G, 'G+12] 32,
+  in5: ['G, 'G+12] 32,
+  in6: ['G, 'G+12] 32,
+  in7: ['G, 'G+12] 32,
+) -> (
+  out0: ['G+11, 'G+12] 32,
+  out1: ['G+11, 'G+12] 32,
+  out2: ['G+11, 'G+12] 32,
+  out3: ['G+11, 'G+12] 32,
+  out4: ['G+11, 'G+12] 32,
+  out5: ['G+11, 'G+12] 32,
+  out6: ['G+11, 'G+12] 32,
+  out7: ['G+11, 'G+12] 32,
+)
+{
+  // Pack the inputs (which arrive on separate wires) into a single bundle
+  // The input bundle lives for 1 cycle (start -> start + 1 cycle)
+  // We use the inputs towards the end, so keep them alive for the duration of circuit evaluation
+  bundle input_bundle[8]: ['G, 'G+12] 32;
+  input_bundle{0} = in0;
+  input_bundle{1} = in1;
+  input_bundle{2} = in2;
+  input_bundle{3} = in3;
+  input_bundle{4} = in4;
+  input_bundle{5} = in5;
+  input_bundle{6} = in6;
+  input_bundle{7} = in7;
+
+  // Generate the first layer
+  // To be concise, I have just created a bundle of size 8 and scheduled to do pairwise additions on the adders
+  // We only need the results at even numbered indices since we want the operands to be exclusive (Filament only allows single increments)
+  bundle first_layer[8]: ['G+1, 'G+12] 32;
+
+  // This is pipelined and takes only a cycle to evaluate!
+  for i in 0..7 {
+    a := new Add[32]<'G>(input_bundle{i}, input_bundle{i + 1});
+    r0 := new Register[32]<'G, 'G+12>(a.out);
+    first_layer{i} = r0.out;
+  }
+
+  // Set the last value manually to avoid indexing problems
+  a := new Add[32]<'G>(input_bundle{6}, input_bundle{7});
+  r0 := new Register[32]<'G, 'G+12>(a.out);
+  first_layer{7} = r0.out;
+
+  // Create the bundle for the second layer
+  // Add using the operands from the first layer
+  bundle second_layer[2]: ['G+3, 'G+12] 32;
+
+  a_1 := new Add[32]<'G + 2>(first_layer{0}, first_layer{2});
+  r1 := new Register[32]<'G+2, 'G+12>(a_1.out);
+  second_layer{0} = r1.out;
+
+  a_2 := new Add[32]<'G + 2>(first_layer{4}, first_layer{6});
+  r2 := new Register[32]<'G+2, 'G+12>(a_2.out);
+  second_layer{1} = r2.out;
+
+  // Repeat again for the top most element
+  bundle third_layer[1]: ['G+4, 'G+12] 32;
+  a_3 := new Add[32]<'G + 3>(second_layer{0}, second_layer{1});
+  r3 := new Register[32]<'G+3, 'G+12>(a_3.out);
+  third_layer{0} = r3.out;
+
+
+  // Set the left subtree sums
+  bundle left_subtree_sums[7]: ['G+4, 'G+12] 32;
+  for i in 0..log2(8) {
+    if i == 0 {
+      left_subtree_sums{0} = second_layer{0};
+    }
+    if i == 1 {
+      left_subtree_sums{1} = first_layer{0};
+      left_subtree_sums{2} = first_layer{4};
+    }
+    if i == 2 {
+      left_subtree_sums{3} = input_bundle{0};
+      left_subtree_sums{4} = input_bundle{2};
+      left_subtree_sums{5} = input_bundle{4};
+      left_subtree_sums{6} = input_bundle{6};
+    }
+  }
+  bundle output_bundle_1[8]: ['G + 7, 'G + 12] 32;
+
+  // Sweep through the first level of the left sums tree
+  // For the right side of the prefix sums tree, push the value down
+  // Otherwise just set the value and move on
+  for i in 0..8 {
+    if i > 3 {
+      output_add := new Add[32]<'G + 6>(input_bundle{i}, left_subtree_sums{0});
+      reg := new Register[32]<'G + 6, 'G + 12>(output_add.out);
+      output_bundle_1{i} = reg.out;
+    } else {
+      output_bundle_1{i} = input_bundle{i};
+    }
+  }
+
+  // Sweep through the second level (again pipelined/parallelized)
+  // Repeat the process for the left side of the second level of the left sums tree
+  // [2, 3] is the range we want to push the sum to
+  bundle output_bundle_2[8]: ['G + 9, 'G + 12] 32;
+  for i in 0..8 {
+    if i > 1 {
+      if i < 4 { // [2, 3]
+        output_add := new Add[32]<'G + 7>(output_bundle_1{i}, left_subtree_sums{1});
+        reg := new Register[32]<'G + 7, 'G + 12>(output_add.out);
+        output_bundle_2{i} = reg.out;
+      } else {
+        output_bundle_2{i} = output_bundle_1{i};
+      }
+    } else {
+        output_bundle_2{i} = output_bundle_1{i};
+    }
+  }
+
+  // Now for the same level, but the right side of the left sums tree
+  bundle output_bundle_3[8]: ['G + 10, 'G + 12] 32;
+  for i in 0..8 {
+      if i > 5 { // [6, 7]
+        output_add := new Add[32]<'G + 9>(output_bundle_2{i}, left_subtree_sums{2});
+        reg := new Register[32]<'G + 9, 'G + 12>(output_add.out);
+        output_bundle_3{i} = reg.out;
+      } else {
+        output_bundle_3{i} = output_bundle_2{i};
+      }
+  }
+
+  // Now for the final level/setting the final values
+  bundle output_bundle_4[8]: ['G + 11, 'G + 12] 32;
+  for i in 0..8 {
+    if i == 1 {
+      output_add := new Add[32]<'G + 10>(output_bundle_3{i}, left_subtree_sums{3});
+      reg := new Register[32]<'G + 10, 'G + 12>(output_add.out);
+      output_bundle_4{i} = reg.out;
+    }
+    if i == 3 {
+      output_add := new Add[32]<'G + 10>(output_bundle_3{i}, left_subtree_sums{4});
+      reg := new Register[32]<'G + 10, 'G + 12>(output_add.out);
+      output_bundle_4{i} = reg.out;
+    }
+    if i == 5 {
+      output_add := new Add[32]<'G + 10>(output_bundle_3{i}, left_subtree_sums{5});
+      reg := new Register[32]<'G + 10, 'G + 12>(output_add.out);
+      output_bundle_4{i} = reg.out;
+    }
+    if i == 7 {
+      output_add := new Add[32]<'G + 10>(output_bundle_3{i}, left_subtree_sums{6});
+      reg := new Register[32]<'G + 10, 'G + 12>(output_add.out);
+      output_bundle_4{i} = reg.out;
+    }
+  }
+
+  // Filament requires that all values in a bundle are set, so pull the previous step values down
+  for i in 0..8 {
+    if i == 0 {
+      output_bundle_4{i} = output_bundle_3{i};
+    }
+    if i == 2 {
+      output_bundle_4{i} = output_bundle_3{i};
+    }
+    if i == 4 {
+      output_bundle_4{i} = output_bundle_3{i};
+    }
+    if i == 6 {
+      output_bundle_4{i} = output_bundle_3{i};
+    }
+  }
+
+  // Pseudocode for sweep-down:
+  // input_bundle{0} = input_bundle{0};
+  // input_bundle{1} = input_bundle{1} + left_subtree_sums{3};
+  // input_bundle{2} = input_bundle{2} + left_subtree_sums{1};
+  // input_bundle{3} = input_bundle{3} + left_subtree_sums{1} + left_subtree_sums{4};
+  // input_bundle{4} = input_bundle{4} + left_subtree_sums{0}
+  // input_bundle{5} = input_bundle{5} + left_subtree_sums{0} + left_subtree_sums{5};
+  // input_bundle{6} = input_bundle{6} + left_subtree_sums{0} + left_subtree_sums{2};
+  // input_bundle{7} = input_bundle{7} + left_subtree_sums{0} + left_subtree_sums{2} + left_subtree_sums{6};
+
+  out0 = output_bundle_4{0};
+  out1 = output_bundle_4{1};
+  out2 = output_bundle_4{2};
+  out3 = output_bundle_4{3};
+  out4 = output_bundle_4{4};
+  out5 = output_bundle_4{5};
+  out6 = output_bundle_4{6};
+  out7 = output_bundle_4{7};
+
+}
