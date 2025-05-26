@@ -9,3 +9,8 @@
 *.run.xml
 *.bbl
 *.bcf
+*.metals/
+*.blg
+target/
+test_run_dir/
+*.bloop/
