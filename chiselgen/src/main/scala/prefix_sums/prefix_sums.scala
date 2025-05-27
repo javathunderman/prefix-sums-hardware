@@ -20,8 +20,12 @@ class PrefixSums(width: Int, array_size: Int, lp: Int) extends Module {
   val listReg = Reg(Vec(array_size, SInt(width.W)))
   val workTree = Reg(Vec((array_size * 2) - 1, SInt(width.W)))
   val loadCounter = new Counter(array_size)
-  val processSteps = new Counter(array_size / 2)
   val list_ind = RegInit(0.U(16.W))
+  val processSteps = new Counter((array_size * 2))
+  val startReadIndex = RegInit((array_size - 1).U(16.W))
+  val startWriteIndex = RegInit(((array_size / 2) - 1).U(16.W))
+  val entries = new Counter((array_size / 2) + 1)
+  val levelSize = RegInit((array_size / 2).U)
   for (i <- 0 until array_size + 1) {
     io.outBlock.bits(i) := 0.S
   } 
@@ -36,7 +40,6 @@ class PrefixSums(width: Int, array_size: Int, lp: Int) extends Module {
     }
     is (PrefixSumsState.load) {
       when (loadCounter.value < ((array_size / lp)).U) {
-        printf(cf"${loadCounter.value}\n")
         for (k <- 0 until lp) {
           listReg(k.U + list_ind) := io.inBlock.bits(k)
           loadCounter.inc()
@@ -46,11 +49,6 @@ class PrefixSums(width: Int, array_size: Int, lp: Int) extends Module {
       .otherwise {
         loadCounter.inc()
         when (loadCounter.value === ((array_size / lp)).U) {
-          printf(cf"${loadCounter.value}\narr: ")
-          for (i <- 0 until array_size) {
-            printf(cf"${listReg(i)} ")
-          }
-          printf("\n")
           for (i <- 0 until array_size) {
             workTree((array_size - 1) + i) := listReg(i)
           }
@@ -58,15 +56,22 @@ class PrefixSums(width: Int, array_size: Int, lp: Int) extends Module {
         }
       }
     }
-    is (PrefixSumsState.process) { // todo: finish
-      printf(cf"${processSteps.value}\n")
-      for (i <- 0 until 8 by 2) {
-        workTree(i) := workTree(i + 7) + workTree(i + 8)
+    is (PrefixSumsState.process) {
+      workTree(startWriteIndex) := workTree(startReadIndex) + workTree(startReadIndex + 1.U)
+      startWriteIndex := startWriteIndex + 1.U
+      startReadIndex := startReadIndex + 2.U
+      entries.inc()
+      processSteps.inc()
+      // printf(cf"startWriteIndex ${startWriteIndex} startreadIndex ${startReadIndex} levelSize ${levelSize} \n")
+      when (entries.value === (levelSize - 1.U)) {
+        levelSize := levelSize / 2.U
+        startWriteIndex := ((startWriteIndex / 2.U)) - (levelSize / 2.U)
+        startReadIndex := ((startReadIndex + 1.U) - (levelSize * 2.U)) / 2.U
+        entries.reset()
       }
-      when (processSteps.value === (array_size / 2).U) {
+      when (processSteps.value === (array_size - 2).U) { // one less than array_size due to tree shape, another to account for counter cycle delay
         state := PrefixSumsState.done
       }
-      processSteps.inc()
     }
     is (PrefixSumsState.done) {
       printf("workTree: ")

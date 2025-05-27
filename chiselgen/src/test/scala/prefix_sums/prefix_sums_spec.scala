@@ -27,7 +27,7 @@ class PrefixSumsSpec extends AnyFreeSpec with ChiselScalatestTester {
       dut.io.inBlock.bits(1).poke(8.S)
       dut.clock.step(2)
       dut.io.state.expect(PrefixSumsState.process)
-      dut.clock.step(4)
+      dut.clock.step(10)
       dut.io.state.expect(PrefixSumsState.done)
 
     }
